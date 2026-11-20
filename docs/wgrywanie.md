@@ -1,6 +1,6 @@
 # Wgrywanie programu
 
-Są trzy urządzenia: **sterownik** (`schody-sterownik`, ESP32) i dwa **czujniki** (`schody-dol`, `schody-gora`, ESP32-C3). Każde wgrywasz raz przez USB, najlepiej na biurku. Potem aktualizacje idą przez Wi-Fi (OTA).
+Są trzy urządzenia: **sterownik** (`schody-sterownik`, ESP32) i dwa **czujniki** (`schody-dol`, `schody-gora`, ESP32 DevKit V1). Każde wgrywasz raz przez USB, najlepiej na biurku. Potem aktualizacje idą przez Wi-Fi (OTA).
 
 ## Co potrzebne
 
@@ -40,9 +40,10 @@ Na każdym urządzeniu: ⋮ → **Validate** → ma być „Configuration is val
 
 Pierwsza kompilacja czujnika pobiera bibliotekę SparkFun VL53L5CX i trwa dłużej (5–15 min).
 
-### ESP32-C3 SuperMini (czujniki)
-- Ma wbudowany USB (bez CH340). Jeśli port się nie pojawia albo „Failed to connect”: **trzymaj BOOT**, wepnij USB (albo kliknij RESET), puść BOOT i dopiero wtedy Connect.
-- Po wgraniu odłącz i podłącz USB, bo C3 czasem zostaje w trybie wgrywania.
+### ESP32 DevKit V1 (czujniki)
+- Układ USB to CP2102 albo CH340 (napis na scalaku obok gniazda USB). Jeśli w Windows nie pojawia się port COM, zainstaluj sterownik do tego układu.
+- Gdy wisi na „Connecting…” albo „Failed to connect”: **przytrzymaj BOOT** do pojawienia się postępu wgrywania (na wielu DevKit V1 automatyczny reset nie działa), ewentualnie trzymaj BOOT i kliknij EN.
+- Na czas wgrywania przez USB odłącz przetwornicę 24 → 5 V od VIN.
 
 ### Sterownik ESP32
 - Płytki z CH340/CP2102 potrzebują sterownika USB w Windows, jeśli nie widać portu COM.

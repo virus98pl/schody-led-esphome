@@ -3,8 +3,8 @@
 substitutions:
   name: schody-gora
   friendly_name: Schody czujnik góra
-  sda: "6"     # ESP32-C3 SuperMini: GPIO6 = SDA
-  scl: "7"     # GPIO7 = SCL
+  sda: "21"    # ESP32 DevKit V1: GPIO21 = SDA (D21)
+  scl: "22"    # GPIO22 = SCL (D22)
 
 packages:
   czujnik: !include czujnik_wspolny.yaml

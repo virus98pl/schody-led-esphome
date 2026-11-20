@@ -39,8 +39,8 @@ ax.text(30, 66, "Taśma WS2814 RGBW 24 V, 15 odcinków × 71,4 mm = 107,1 cm na 
         "Zasilanie: każdy stopień własnym kablem 2 × 0,75 mm² od listwy bezpieczników", fontsize=8.5, va="top")
 line([(24, 41), (46, 41)], R, 2); ax.text(26, 42, "16 × kabel 2-żyłowy do stopni", fontsize=8, color=R)
 
-box(108, 4, 20, 13, "Czujnik DÓŁ\nESP32-C3 + VL53L5CX\nschody-dol\n(podstopnica stopnia 1)", "#e8f5e9", 8)
-box(108, 50, 20, 13, "Czujnik GÓRA\nESP32-C3 + VL53L5CX\nschody-gora\n(ostatni stopień / podest)", "#e8f5e9", 8)
+box(108, 4, 20, 13, "Czujnik DÓŁ\nESP32 DevKit V1\n+ VL53L5CX, schody-dol\n(podstopnica stopnia 1)", "#e8f5e9", 8)
+box(108, 50, 20, 13, "Czujnik GÓRA\nESP32 DevKit V1\n+ VL53L5CX, schody-gora\n(ostatni stopień / podest)", "#e8f5e9", 8)
 box(62, 1, 30, 6, "przetwornica 24→5 V + bezpiecznik 0,5 A\nprzy każdym czujniku", "#e8f5e9", 7.5)
 line([(108, 10), (96, 10)], P, 1.5, "--"); line([(108, 56), (100, 56)], P, 1.5, "--")
 ax.text(95, 11, "Wi-Fi / UDP", fontsize=8, color=P); ax.text(99, 57, "Wi-Fi / UDP", fontsize=8, color=P)

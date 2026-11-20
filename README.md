@@ -24,12 +24,12 @@ Wszystko działa lokalnie: czujniki wysyłają ruch prosto do sterownika po UDP,
 | Bezpieczniki 2 A z oprawkami (lub listwa) | 16 | jeden na stopień |
 | Sterownik **ESP32** z konwerterem poziomów 3,3 → 5 V na linii danych | 1 | np. płytka typu „WLED controller 24 V” albo ESP32 DevKit + 74AHCT125 |
 | Rezystor 220–470 Ω na wyjściu danych | 1 | przy sterowniku |
-| **ESP32-C3 SuperMini** | 2 | czujnik dół i góra |
+| **ESP32 DevKit V1** (ESP32-WROOM-32, 30 pinów) | 2 | czujnik dół i góra |
 | **VL53L5CX** (moduł na płytce, I2C) | 2 | |
 | Przetwornica 24 → 5 V (np. MP1584, ustawiona na 5,0 V) + bezpiecznik 0,5 A + kondensator 470 µF | 2 | zasilanie czujników z linii 24 V |
 | Przewód 2 × 0,75 mm² do każdego stopnia, zworki 2 × 0,35 mm² (DATA + GND) między stopniami | – | |
 
-> ESP8266 (NodeMCU v3) nie wystarczy na VL53L5CX – sterownik czujnika potrzebuje więcej RAM, dlatego czujniki są na ESP32-C3.
+> ESP8266 (NodeMCU v3) nie wystarczy na VL53L5CX – sterownik czujnika potrzebuje więcej RAM, dlatego czujniki są na ESP32 (DevKit V1).
 
 ## Podłączenie
 
@@ -43,17 +43,17 @@ Wszystko działa lokalnie: czujniki wysyłają ruch prosto do sterownika po UDP,
 | GND | masa zasilacza 24 V i masa taśm |
 | zasilanie | 24 V (płytki 24 V) albo 5 V z przetwornicy |
 
-**Czujnik (ESP32-C3 SuperMini)**
+**Czujnik (ESP32 DevKit V1)**
 
-| Pin C3 | VL53L5CX |
+| Pin DevKit V1 | VL53L5CX |
 |---|---|
 | 3V3 | VIN (lub 5 V, jeśli moduł ma stabilizator) |
 | GND | GND |
-| GPIO6 | SDA |
-| GPIO7 | SCL |
+| D21 (GPIO21) | SDA |
+| D22 (GPIO22) | SCL |
 | – | LPn: na wielu modułach podciągnięty na płytce; jeśli nie, połącz z 3V3 |
 
-C3 zasilasz z przetwornicy 24 → 5 V (pin 5V i GND), odgałęzionej z listwy zasilającej przed taśmą, nie z samej taśmy.
+DevKit V1 zasilasz z przetwornicy 24 → 5 V (pin **VIN** i GND), odgałęzionej z listwy zasilającej przed taśmą, nie z samej taśmy.
 
 **Taśmy:** dane szeregowo **DO stopnia → DI następnego**, zgodnie ze strzałkami na taśmie. Układaj „wężykiem” (stopień 1 od lewej, stopień 2 od prawej…), wtedy zworki mają po 30–40 cm. Każdy stopień dostaje 24 V i GND własnym kablem od listwy bezpieczników. Masa zasilacza, sterownika i taśm musi być wspólna.
 

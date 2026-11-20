@@ -1,6 +1,7 @@
 # =====================================================================
 #  SCHODY – czujnik VL53L5CX (wspólna część dla schody-dol i schody-gora)
-#  ESP32-C3 SuperMini + VL53L5CX (I2C), w obudowie podtynkowej w stopniu.
+#  ESP32 DevKit V1 (ESP32-WROOM-32) + VL53L5CX (I2C), w obudowie podtynkowej w stopniu.
+#  Inna płytka ESP32? Zmień board poniżej i piny sda/scl w schody-dol / schody-gora.
 #  Ruch wysyła do sterownika po UDP (packet_transport) i do HA (API).
 # =====================================================================
 
@@ -9,7 +10,7 @@ esphome:
   friendly_name: ${friendly_name}
 
 esp32:
-  board: esp32-c3-devkitm-1
+  board: esp32dev
   framework:
     type: arduino
 
