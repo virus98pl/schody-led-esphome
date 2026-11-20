@@ -1,0 +1,34 @@
+# Karta do panelu HA: Edytuj panel → + Dodaj kartę → Ręcznie (YAML) → wklej.
+# Jeśli Twoje encje mają inne nazwy, popraw je według listy w
+# Ustawienia → Urządzenia → schody-sterownik.
+type: vertical-stack
+cards:
+  - type: tile
+    entity: light.schody_swiatlo
+    name: Schody
+    features:
+      - type: light-brightness
+  - type: entities
+    entities:
+      - entity: switch.schody_automatyka
+      - entity: switch.schody_tylko_w_nocy
+      - entity: binary_sensor.schody_ruch_dol
+      - entity: binary_sensor.schody_ruch_gora
+      - entity: binary_sensor.schody_schody_swieca
+      - type: buttons
+        entities:
+          - entity: button.schody_test_od_dolu
+            name: Test ↑
+          - entity: button.schody_test_od_gory
+            name: Test ↓
+  - type: entities
+    title: Ustawienia
+    state_color: false
+    entities:
+      - entity: number.schody_opoznienie_miedzy_stopniami
+      - entity: number.schody_czas_swiecenia
+      - entity: number.schody_plynnosc_rozjasniania
+      - entity: switch.schody_poswiata_pierwszego_i_ostatniego_stopnia
+      - entity: number.schody_poswiata_jasnosc
+      - entity: number.schody_noc_od_godziny
+      - entity: number.schody_noc_do_godziny

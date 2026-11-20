@@ -1,0 +1,374 @@
+# =====================================================================
+#  SCHODY – sterownik taśm LED (ESP32 + ESPHome)
+#  16 stopni × taśma WS2814 RGBW 24 V (COB, cięcie co 71,4 mm = 15 pikseli)
+#
+#  Czujniki VL53L5CX na pierwszym i ostatnim stopniu (schody-dol / schody-gora)
+#  wysyłają ruch prosto do sterownika po UDP w sieci lokalnej, więc schody
+#  działają też wtedy, gdy Home Assistant leży.
+#
+#  Encja „Schody Światło” (light):
+#   - efekt „Schody auto”  → normalna praca: zapalanie stopień po stopniu
+#   - bez efektu          → wszystkie stopnie świecą na stałe (sprzątanie)
+#   - wyłączone           → schody całkowicie wyłączone
+#  Kolor i jasność ustawiasz na tej samej encji (biel = kanał W).
+# =====================================================================
+
+substitutions:
+  name: schody-sterownik
+  friendly_name: Schody
+  led_pin: GPIO16          # pin danych taśmy – sprawdź w opisie swojej płytki
+  channel_colors: GRBW     # kolejność kanałów WS2814 – sprawdź testem (patrz README)
+  stopnie: "16"
+  px_na_stopien: "15"
+  liczba_led: "240"        # stopnie × px_na_stopien
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  on_boot:
+    priority: -100
+    then:
+      - if:
+          condition:
+            light.is_on: schody
+          then:
+            - light.turn_on:
+                id: schody
+                effect: "Schody auto"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "schody-awaryjny"
+    password: !secret ap_password
+
+captive_portal:
+
+web_server:
+  port: 80
+
+time:
+  - platform: sntp
+    id: czas
+    timezone: Europe/Warsaw
+
+# ---------------------------------------------------------------------
+#  Odbiór ruchu z czujników (UDP, rozgłoszenie w sieci lokalnej)
+# ---------------------------------------------------------------------
+udp:
+  - id: udp_bus
+
+packet_transport:
+  - platform: udp
+    id: czujniki
+    udp_id: udp_bus
+    providers:
+      - name: schody-dol
+      - name: schody-gora
+
+binary_sensor:
+  - platform: packet_transport
+    id: ruch_dol
+    name: "Ruch dół"
+    transport_id: czujniki
+    provider: schody-dol
+    remote_id: ruch
+    on_press:
+      - script.execute:
+          id: wyzwol
+          skad: 1
+
+  - platform: packet_transport
+    id: ruch_gora
+    name: "Ruch góra"
+    transport_id: czujniki
+    provider: schody-gora
+    remote_id: ruch
+    on_press:
+      - script.execute:
+          id: wyzwol
+          skad: -1
+
+  - platform: template
+    name: "Schody świecą"
+    lambda: return id(faza) != 0;
+
+# ---------------------------------------------------------------------
+#  Stan animacji
+#  faza: 0 = spoczynek, 1 = zapalanie / świecenie, 2 = gaszenie
+#  kierunek: 1 = od dołu (stopień 1 pierwszy), -1 = od góry
+# ---------------------------------------------------------------------
+globals:
+  - id: faza
+    type: int
+    initial_value: "0"
+  - id: kierunek
+    type: int
+    initial_value: "1"
+  - id: t_start
+    type: uint32_t
+    initial_value: "0"
+  - id: t_koniec
+    type: uint32_t
+    initial_value: "0"
+  - id: t_gas
+    type: uint32_t
+    initial_value: "0"
+  - id: noc
+    type: bool
+    initial_value: "true"
+
+script:
+  # ruch z czujnika – sprawdza automatykę i porę dnia
+  - id: wyzwol
+    parameters:
+      skad: int
+    then:
+      - if:
+          condition:
+            lambda: |-
+              if (!id(automatyka).state) return false;
+              if (id(tylko_noc).state && !id(noc)) return false;
+              return true;
+          then:
+            - script.execute:
+                id: zapal
+                skad: !lambda return skad;
+
+  # samo zapalenie (używane też przez przyciski testowe)
+  - id: zapal
+    parameters:
+      skad: int
+    then:
+      - lambda: |-
+          const uint32_t teraz = millis();
+          const uint32_t sekw = (uint32_t) (${stopnie} - 1) * (uint32_t) id(opoznienie).state;
+          if (id(faza) == 0) {
+            id(kierunek) = skad;
+            id(t_start) = teraz;
+          } else if (id(faza) == 2) {
+            // ktoś wszedł w trakcie gaszenia – zapal od razu wszystko,
+            // a gaszenie później pójdzie w kierunku tej osoby
+            id(kierunek) = skad;
+            id(t_start) = teraz - sekw;
+          } else if (teraz - id(t_start) >= sekw) {
+            // wszystko już świeci – gaszenie w kierunku ostatniej osoby
+            id(kierunek) = skad;
+          }
+          id(faza) = 1;
+          id(t_koniec) = teraz + sekw + (uint32_t) (id(czas_swiecenia).state * 1000.0f);
+
+interval:
+  # przejścia faz
+  - interval: 100ms
+    then:
+      - lambda: |-
+          const uint32_t teraz = millis();
+          const uint32_t sekw = (uint32_t) (${stopnie} - 1) * (uint32_t) id(opoznienie).state;
+          // dopóki ktoś stoi przed czujnikiem, nie gaś
+          if (id(faza) == 1 && (id(ruch_dol).state || id(ruch_gora).state)) {
+            uint32_t min_koniec = teraz + (uint32_t) (id(czas_swiecenia).state * 1000.0f);
+            if ((int32_t) (min_koniec - id(t_koniec)) > 0) id(t_koniec) = min_koniec;
+          }
+          if (id(faza) == 1 && (int32_t) (teraz - id(t_koniec)) >= 0) {
+            id(faza) = 2;
+            id(t_gas) = teraz;
+          } else if (id(faza) == 2 &&
+                     teraz - id(t_gas) > sekw + (uint32_t) id(plynnosc).state * 4 + 500) {
+            id(faza) = 0;
+          }
+
+  # pora dnia (dla „Tylko w nocy” i poświaty)
+  - interval: 30s
+    then:
+      - lambda: |-
+          auto t = id(czas).now();
+          if (!t.is_valid()) { id(noc) = true; return; }
+          const int h = t.hour;
+          const int od = (int) id(noc_od).state;
+          const int do_ = (int) id(noc_do).state;
+          id(noc) = (od > do_) ? (h >= od || h < do_) : (h >= od && h < do_);
+
+# ---------------------------------------------------------------------
+#  Taśma
+# ---------------------------------------------------------------------
+light:
+  - platform: esp32_rmt_led_strip
+    id: schody
+    name: "Światło"
+    pin: ${led_pin}
+    num_leds: ${liczba_led}
+    chipset: SK6812          # WS2814 ma takie same czasy jak SK6812
+    channel_colors: ${channel_colors}
+    restore_mode: RESTORE_DEFAULT_ON
+    default_transition_length: 300ms
+    effects:
+      - addressable_lambda:
+          name: "Schody auto"
+          update_interval: 20ms
+          lambda: |-
+            const int N = ${stopnie};
+            const int P = ${px_na_stopien};
+            static float poziom[${stopnie}] = {0};
+            const uint32_t teraz = millis();
+            const float opoz = id(opoznienie).state;
+            const float fade = id(plynnosc).state;
+            const float alfa = fade <= 20.0f ? 1.0f : 20.0f / fade;
+            const bool poswiata = id(poswiata_wl).state && (!id(tylko_noc).state || id(noc));
+            const float pos = id(poswiata_poz).state / 100.0f;
+
+            for (int k = 0; k < N; k++) {
+              const int kolejnosc = (id(kierunek) == 1) ? k : (N - 1 - k);
+              const float spoczynek = (poswiata && (k == 0 || k == N - 1)) ? pos : 0.0f;
+              float cel = spoczynek;
+              if (id(faza) == 1) {
+                cel = ((int32_t) (teraz - id(t_start)) >= (int32_t) (kolejnosc * opoz)) ? 1.0f : spoczynek;
+              } else if (id(faza) == 2) {
+                cel = ((int32_t) (teraz - id(t_gas)) >= (int32_t) (kolejnosc * opoz)) ? spoczynek : 1.0f;
+              }
+              poziom[k] += (cel - poziom[k]) * alfa;
+              const uint8_t skala = (uint8_t) (poziom[k] * 255.0f + 0.5f);
+              const Color c = current_color * skala;
+              for (int i = 0; i < P; i++) it[k * P + i] = c;
+            }
+
+# ---------------------------------------------------------------------
+#  Ustawienia w Home Assistant (zapisywane w pamięci ESP)
+# ---------------------------------------------------------------------
+switch:
+  - platform: template
+    id: automatyka
+    name: "Automatyka"
+    icon: mdi:stairs
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: template
+    id: tylko_noc
+    name: "Tylko w nocy"
+    icon: mdi:weather-night
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    entity_category: config
+
+  - platform: template
+    id: poswiata_wl
+    name: "Poświata pierwszego i ostatniego stopnia"
+    icon: mdi:lightbulb-night-outline
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+
+number:
+  - platform: template
+    id: opoznienie
+    name: "Opóźnienie między stopniami"
+    unit_of_measurement: ms
+    min_value: 20
+    max_value: 500
+    step: 10
+    initial_value: 120
+    optimistic: true
+    restore_value: true
+    entity_category: config
+
+  - platform: template
+    id: czas_swiecenia
+    name: "Czas świecenia"
+    unit_of_measurement: s
+    min_value: 3
+    max_value: 300
+    step: 1
+    initial_value: 25
+    optimistic: true
+    restore_value: true
+    entity_category: config
+
+  - platform: template
+    id: plynnosc
+    name: "Płynność rozjaśniania"
+    unit_of_measurement: ms
+    min_value: 0
+    max_value: 2000
+    step: 50
+    initial_value: 400
+    optimistic: true
+    restore_value: true
+    entity_category: config
+
+  - platform: template
+    id: poswiata_poz
+    name: "Poświata – jasność"
+    unit_of_measurement: "%"
+    min_value: 1
+    max_value: 50
+    step: 1
+    initial_value: 8
+    optimistic: true
+    restore_value: true
+    entity_category: config
+
+  - platform: template
+    id: noc_od
+    name: "Noc od godziny"
+    min_value: 0
+    max_value: 23
+    step: 1
+    initial_value: 17
+    optimistic: true
+    restore_value: true
+    entity_category: config
+
+  - platform: template
+    id: noc_do
+    name: "Noc do godziny"
+    min_value: 0
+    max_value: 23
+    step: 1
+    initial_value: 7
+    optimistic: true
+    restore_value: true
+    entity_category: config
+
+button:
+  - platform: template
+    name: "Test od dołu"
+    icon: mdi:arrow-up-bold
+    on_press:
+      - script.execute:
+          id: zapal
+          skad: 1
+
+  - platform: template
+    name: "Test od góry"
+    icon: mdi:arrow-down-bold
+    on_press:
+      - script.execute:
+          id: zapal
+          skad: -1
+
+  - platform: restart
+    name: "Restart"
+
+sensor:
+  - platform: wifi_signal
+    name: "Sygnał Wi-Fi"
+    update_interval: 60s
+  - platform: uptime
+    name: "Czas pracy"
